@@ -18,47 +18,46 @@ spring:
         # ==========================================
         # 1. ROTAS 100% PÚBLICAS (Sem a linha do filtro)
         # ==========================================
-        # Liberação dos endpoints de documentação (v3/api-docs) de cada microsserviço
+        # Liberação dos endpoints do Swagger (agora buscando pelo Eureka via lb://)
         - id: swagger-docs-auth
-          uri: http://localhost:8089
+          uri: lb://ms-auth
           predicates:
             - Path=/api/auth/v3/api-docs
 
         - id: swagger-docs-professor
-          uri: http://localhost:8086
+          uri: lb://ms-professor
           predicates:
             - Path=/api/professores/v3/api-docs
 
         - id: swagger-docs-escolas
-          uri: http://localhost:8081
+          uri: lb://escola-service
           predicates:
-            - Path=/api/escolas/v3/api-docs
-            - Path=/api/ies/v3/api-docs
+            - Path=/api/escolas/v3/api-docs, /api/ies/v3/api-docs
 
         - id: swagger-docs-espacos
-          uri: http://localhost:8083
+          uri: lb://microservico_espaco
           predicates:
             - Path=/espacos/v3/api-docs
 
         - id: swagger-docs-softwares
-          uri: http://localhost:8084
+          uri: lb://microservico_software
           predicates:
             - Path=/softwares/v3/api-docs
 
         - id: swagger-docs-solicitacoes
-          uri: http://localhost:8085
+          uri: lb://ms-solicitacoes
           predicates:
             - Path=/api/solicitacoes/v3/api-docs
 
         # Liberação do endpoint de Login público
         - id: ms-auth-login
-          uri: http://localhost:8089
+          uri: lb://ms-auth
           predicates:
             - Path=/api/auth/login
 
         # Liberação do endpoint de Cadastro de Professor público
         - id: ms-professor-cadastro
-          uri: http://localhost:8086
+          uri: lb://ms-professor
           predicates:
             - Path=/api/professores
             - Method=POST
@@ -67,54 +66,58 @@ spring:
         # 2. ROTAS PROTEGIDAS (Exigem Token JWT)
         # ==========================================
         - id: ms-auth
-          uri: http://localhost:8089
+          uri: lb://ms-auth
           predicates:
             - Path=/api/auth/**
           filters:
             - AuthenticationFilter
 
         - id: ms-professor
-          uri: http://localhost:8086
+          uri: lb://ms-professor
           predicates:
             - Path=/api/professores/**
           filters:
             - AuthenticationFilter
 
         - id: escola-service
-          uri: http://localhost:8081
+          uri: lb://escola-service
           predicates:
-              # Coloque tudo na mesma linha com vírgula!
-              - Path=/api/escolas/**, /api/ies/**
+            - Path=/api/escolas/**, /api/ies/**
           filters:
-              - AuthenticationFilter
+            - AuthenticationFilter
 
         - id: microservico_espaco
-          uri: http://localhost:8083
+          uri: lb://microservico_espaco
           predicates:
             - Path=/espacos/**
           filters:
             - AuthenticationFilter
 
         - id: microservico_software
-          uri: http://localhost:8084
+          uri: lb://microservico_software
           predicates:
             - Path=/softwares/**
           filters:
             - AuthenticationFilter
 
         - id: ms-solicitacoes
-          uri: http://localhost:8085
+          uri: lb://ms-solicitacoes
           predicates:
             - Path=/api/solicitacoes/**
           filters:
             - AuthenticationFilter
 
+# ==========================================
+# 3. CONFIGURAÇÃO DO EUREKA CLIENT
+# ==========================================
 eureka:
   client:
-    enabled: false
-    register-with-eureka: false
-    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
 
+# Chave JWT
 api:
   security:
     token:
