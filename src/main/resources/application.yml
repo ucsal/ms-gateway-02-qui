@@ -1,0 +1,122 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:4200"
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: "*"
+            allowCredentials: true
+
+      routes:
+        # ==========================================
+        # 1. ROTAS 100% PÚBLICAS (Sem a linha do filtro)
+        # ==========================================
+        # Liberação dos endpoints de documentação (v3/api-docs) de cada microsserviço
+        - id: swagger-docs-auth
+          uri: http://localhost:8089
+          predicates:
+            - Path=/api/auth/v3/api-docs
+
+        - id: swagger-docs-professor
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/professores/v3/api-docs
+
+        - id: swagger-docs-escolas
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/escolas/v3/api-docs
+            - Path=/api/ies/v3/api-docs
+
+        - id: swagger-docs-espacos
+          uri: http://localhost:8083
+          predicates:
+            - Path=/espacos/v3/api-docs
+
+        - id: swagger-docs-softwares
+          uri: http://localhost:8084
+          predicates:
+            - Path=/softwares/v3/api-docs
+
+        - id: swagger-docs-solicitacoes
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/solicitacoes/v3/api-docs
+
+        # Liberação do endpoint de Login público
+        - id: ms-auth-login
+          uri: http://localhost:8089
+          predicates:
+            - Path=/api/auth/login
+
+        # Liberação do endpoint de Cadastro de Professor público
+        - id: ms-professor-cadastro
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/professores
+            - Method=POST
+
+        # ==========================================
+        # 2. ROTAS PROTEGIDAS (Exigem Token JWT)
+        # ==========================================
+        - id: ms-auth
+          uri: http://localhost:8089
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - AuthenticationFilter
+
+        - id: ms-professor
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/professores/**
+          filters:
+            - AuthenticationFilter
+
+        - id: escola-service
+          uri: http://localhost:8081
+          predicates:
+              # Coloque tudo na mesma linha com vírgula!
+              - Path=/api/escolas/**, /api/ies/**
+          filters:
+              - AuthenticationFilter
+
+        - id: microservico_espaco
+          uri: http://localhost:8083
+          predicates:
+            - Path=/espacos/**
+          filters:
+            - AuthenticationFilter
+
+        - id: microservico_software
+          uri: http://localhost:8084
+          predicates:
+            - Path=/softwares/**
+          filters:
+            - AuthenticationFilter
+
+        - id: ms-solicitacoes
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/solicitacoes/**
+          filters:
+            - AuthenticationFilter
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+api:
+  security:
+    token:
+      secret: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
+
