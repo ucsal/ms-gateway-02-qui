@@ -35,8 +35,9 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
+            String path = request.getURI().getPath();
 
-            // Se a requisição não tiver o cabeçalho de autorização, bloqueia
+            // 1. Verifica se a requisição possui o token
             if (!request.getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
                 return onError(exchange, "Faltou o token", HttpStatus.UNAUTHORIZED);
             }
@@ -49,6 +50,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             String token = authHeader.substring(7);
 
             try {
+                // 2. Descriptografa e lê o payload do Token
                 SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
                 Claims claims = Jwts.parserBuilder()
                         .setSigningKey(key)
@@ -56,13 +58,38 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                         .parseClaimsJws(token)
                         .getBody();
 
+                // 3. Extrai a role (perfil) salva dentro do Token
+                String role = claims.get("role", String.class);
+                if (role == null) {
+                    role = "";
+                }
+
+                // ========================================================================
+                // 🛡️ REGRAS DE AUTORIZAÇÃO (RBAC)
+                // ========================================================================
+
+                // Regra: Apenas ADMIN pode listar a base de professores
+                if (path.contains("/api/professores") && request.getMethod().name().equals("GET")) {
+                    if (!role.toUpperCase().contains("ADMIN")) {
+                        return onError(exchange, "Acesso Negado: Apenas Administradores", HttpStatus.FORBIDDEN);
+                    }
+                }
+
+                // Você pode adicionar mais regras de RBAC aqui no futuro!
+                // Exemplo: if (path.contains("/api/escolas") && ... )
+
+                // ========================================================================
+
+                // 4. Injeta os dados nos headers para o microsserviço de destino saber quem é
                 ServerHttpRequest mutatedRequest = request.mutate()
                         .header("X-User-Email", claims.getSubject())
+                        .header("X-User-Role", role)
                         .build();
 
                 return chain.filter(exchange.mutate().request(mutatedRequest).build());
+
             } catch (Exception e) {
-                return onError(exchange, "Token inválido", HttpStatus.FORBIDDEN);
+                return onError(exchange, "Token inválido ou expirado", HttpStatus.FORBIDDEN);
             }
         };
     }
@@ -70,6 +97,10 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     private Mono<Void> onError(ServerWebExchange exchange, String err, HttpStatus status) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(status);
+
+        // Adiciona a mensagem de erro no Header da resposta para você conseguir ler no Postman!
+        response.getHeaders().add("X-Auth-Error", err);
+
         return response.setComplete();
     }
 }
